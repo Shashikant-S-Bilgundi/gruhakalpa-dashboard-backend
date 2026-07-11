@@ -29,6 +29,7 @@ import { MemberProtectedRoute } from "./components/MemberProtectedRoute";
 import { MemberDashboard } from "./components/MemberDashboard";
 import { InwardOutward } from "./components/InwardOutward";
 import { UpcomingPayments } from "./components/UpcomingPayments";
+import { BankStatement } from "./components/BankStatement";
 
 const MainApp = () => {
   const location = useLocation();
@@ -47,6 +48,7 @@ const MainApp = () => {
     "/superadmin/receiptlist",
     "/superadmin/inwardoutward",
     "/superadmin/payments-due",
+    "/superadmin/bankstatement",
   ];
 
   const memberRoutes = ["/member/dashboard"];
@@ -169,6 +171,14 @@ const MainApp = () => {
               </SuperAdminProtectedRoute>
             }
           />
+          <Route
+            path="/superadmin/bankstatement"
+            element={
+              <SuperAdminProtectedRoute>
+                <BankStatement />
+              </SuperAdminProtectedRoute>
+            }
+          />
 
           {/* Admin Protected Routes */}
           <Route
@@ -256,6 +266,14 @@ const MainApp = () => {
             element={
               <ProtectedRoute>
                 <UpcomingPayments />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/bankstatement"
+            element={
+              <ProtectedRoute>
+                <BankStatement />
               </ProtectedRoute>
             }
           />

@@ -56,22 +56,12 @@ const defaultFormData = {
   chequeNo: "",
 };
 
-// Payment items list
-// Optional separate fees kept alongside the Enter-Amount waterfall.
-// These are NOT part of the down-payment / installment schedule — they are
-// added on top of whatever the entered amount is allocated to.
+
 const OPTIONAL_FEE_ITEMS = [
-  "Share",
-  "Membership Fee",
-  "Admission Fee",
-  "Share Fee",
   "Deposits",
   "Penalty",
-  "Miscellaneous",
 ];
 
-// Payment buckets that the entered amount waterfalls into, in order.
-// Down Payment first, then Installment 1..14 (matches SiteBookingForm schedule).
 const INSTALLMENT_PAYMENT_NAMES = [
   "Down Payment",
   ...Array.from({ length: 14 }, (_, i) => `Installment ${i + 1}`),
@@ -1063,7 +1053,6 @@ body { background: white !important; }
                     value={formik.values.receiptNo}
                     onChange={formik.handleChange}
                     onBlur={formik.handleBlur}
-                    placeholder="e.g., RCP/2024/001"
                     className={`w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 ${
                       formik.touched.receiptNo && formik.errors.receiptNo
                         ? "border-orange-500 focus:ring-orange-500"
@@ -1125,7 +1114,6 @@ body { background: white !important; }
                       type="text"
                       value={membershipInput}
                       onChange={handleMembershipInputChange}
-                      placeholder="001"
                       maxLength="4"
                       className="flex-1 px-3 py-1.5 text-sm focus:outline-none bg-white"
                     />
@@ -1167,7 +1155,6 @@ body { background: white !important; }
                     value={formik.values.receivedFrom}
                     onChange={formik.handleChange}
                     onBlur={formik.handleBlur}
-                    placeholder="Auto-filled from database"
                     className={`w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 ${
                       formik.touched.receivedFrom && formik.errors.receivedFrom
                         ? "border-red-500 focus:ring-orange-500"
@@ -1205,7 +1192,6 @@ body { background: white !important; }
                           type="text"
                           value={tid}
                           onChange={(e) => updateTransactionId(index, e.target.value)}
-                          placeholder="Transaction ID"
                           className="w-[340px] px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-orange-500"
                         />
                       </div>
@@ -1230,7 +1216,6 @@ body { background: white !important; }
                     value={formik.values.siteDimension}
                     onChange={formik.handleChange}
                     onBlur={formik.handleBlur}
-                    placeholder="e.g., 30x40"
                     className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-orange-500"
                   />
                   <p className="text-xs text-gray-500 mt-1">Auto-filled from Site Booking if available</p>
@@ -1257,7 +1242,6 @@ body { background: white !important; }
                             type="text"
                             value={bankEntry.branch}
                             readOnly
-                            placeholder="Auto-filled from bank"
                             className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-gray-50 text-gray-600 cursor-not-allowed focus:outline-none"
                           />
                         </div>
@@ -1277,7 +1261,6 @@ body { background: white !important; }
                     value={formik.values.phoneNumber}
                     onChange={formik.handleChange}
                     onBlur={formik.handleBlur}
-                    placeholder="Auto-filled from database"
                     className={`w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 ${
                       formik.touched.phoneNumber && formik.errors.phoneNumber ? "border-red-500 focus:ring-orange-500" : "border-gray-300 focus:ring-orange-500"
                     }`}
@@ -1298,7 +1281,6 @@ body { background: white !important; }
                     onChange={formik.handleChange}
                     onBlur={formik.handleBlur}
                     value={formik.values.Email}
-                    placeholder="Auto-filled from database"
                     className={`w-full px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-1 ${
                       formik.touched.Email && formik.errors.Email ? "border-red-500 focus:ring-orange-500" : "border-gray-300 focus:ring-orange-500"
                     }`}
@@ -1336,7 +1318,6 @@ body { background: white !important; }
                         options={addressOptions}
                         value={formik.values.flatNumber}
                         onChange={(val) => formik.setFieldValue("flatNumber", val)}
-                        placeholder="— Select a saved address —"
                       />
                     </div>
                   )}
