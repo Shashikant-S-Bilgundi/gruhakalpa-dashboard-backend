@@ -30,6 +30,8 @@ import { MemberDashboard } from "./components/MemberDashboard";
 import { InwardOutward } from "./components/InwardOutward";
 import { UpcomingPayments } from "./components/UpcomingPayments";
 import { BankStatement } from "./components/BankStatement";
+import { FixedDepositForm } from "./components/FixedDepositForm";
+import { RecurringDepositForm } from "./components/RecurringDepositForm";
 
 const MainApp = () => {
   const location = useLocation();
@@ -179,6 +181,22 @@ const MainApp = () => {
               </SuperAdminProtectedRoute>
             }
           />
+          <Route
+            path="/superadmin/fixeddeposit"
+            element={
+              <SuperAdminProtectedRoute>
+                <FixedDepositForm />
+              </SuperAdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/superadmin/recurringdeposit"
+            element={
+              <SuperAdminProtectedRoute>
+                <RecurringDepositForm />
+              </SuperAdminProtectedRoute>
+            }
+          />
 
           {/* Admin Protected Routes */}
           <Route
@@ -274,6 +292,22 @@ const MainApp = () => {
             element={
               <ProtectedRoute>
                 <BankStatement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fixeddeposit"
+            element={
+              <ProtectedRoute>
+                <FixedDepositForm />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/recurringdeposit"
+            element={
+              <ProtectedRoute>
+                <RecurringDepositForm />
               </ProtectedRoute>
             }
           />
