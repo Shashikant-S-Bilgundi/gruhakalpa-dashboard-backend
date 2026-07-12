@@ -5,6 +5,27 @@ import { toast } from "react-toastify";
 
 const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:3001";
 
+// Add N calendar months to a date, clamping the day (Jan 31 + 1mo -> Feb 28/29)
+const addMonths = (base, months) => {
+  const d = new Date(base);
+  const day = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + months);
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(day, lastDay));
+  return d;
+};
+
+// Pretty-print a date, or an em-dash when missing
+const fmtDate = (d) =>
+  d
+    ? new Date(d).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : "—";
+
 export function SiteBookingList() {
   const isSuperAdmin = !!localStorage.getItem("superAdminToken");
   const isAdmin = !!localStorage.getItem("adminToken");
@@ -244,6 +265,107 @@ export function SiteBookingList() {
     const paidAmount = totalPaid - membershipFee;   // site payment only e.g. 102500 - 2500 = 100000
     const remainingAmount = totalAmount - paidAmount; // 500000 - 100000 = 400000
     return { totalAmount, paidAmount, remainingAmount, isNewUser };
+  };
+
+  // Status pill colours for the schedule table
+  const statusStyle = {
+    Paid: "bg-green-100 text-green-700",
+    Partial: "bg-amber-100 text-amber-700",
+    Overdue: "bg-red-100 text-red-600",
+    Pending: "bg-gray-100 text-gray-500",
+  };
+
+  // ── Build the ordered installment schedule for a booking, and attribute how
+  //    much has been paid toward each bucket (and WHEN) from the member's
+  //    receipts. Payments waterfall across buckets in date order — Down Payment
+  //    first, then Installment 1, 2, ... — so partial payments fill earlier
+  //    buckets first. The membership fee (₹2500 for new users) is excluded so
+  //    it doesn't inflate the first bucket.
+  const buildSchedule = (member, receipts, isNewUser) => {
+    const bookingDate = member.date ? new Date(member.date) : new Date();
+    const rows = [];
+    const dp = Number(member.downpayment) || 0;
+    const isFull = member.paymentplan === "full";
+    const installments = Array.isArray(member.installments)
+      ? member.installments
+      : [];
+
+    if (isFull && installments.length === 0) {
+      rows.push({
+        label: "Full Payment",
+        amount: Number(member.totalamount) || 0,
+        dueDate: member.downPaymentDate || bookingDate,
+      });
+    } else {
+      if (dp > 0) {
+        rows.push({
+          label: "Down Payment",
+          amount: dp,
+          dueDate: member.downPaymentDate || bookingDate,
+        });
+      }
+      installments.forEach((it, i) => {
+        const amt = Number(it.amount) || 0;
+        if (amt <= 0) return;
+        rows.push({
+          label: it.label || `Installment ${i + 1}`,
+          amount: amt,
+          // Stored due date wins; legacy bookings fall back to monthly schedule.
+          dueDate: it.dueDate || addMonths(bookingDate, i + 1),
+        });
+      });
+    }
+
+    // Date-ordered payment chunks, with the membership fee peeled off the front.
+    const active = (receipts || [])
+      .filter((r) => !r.cancelled)
+      .slice()
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+    const chunks = active.map((r) => ({
+      amount: Number(r.amountpaid) || 0,
+      date: r.date,
+    }));
+    let feeToRemove = isNewUser ? MEMBERSHIP_FEE : 0;
+    for (const c of chunks) {
+      if (feeToRemove <= 0) break;
+      const cut = Math.min(feeToRemove, c.amount);
+      c.amount -= cut;
+      feeToRemove -= cut;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let ci = 0;
+    for (const row of rows) {
+      let need = row.amount;
+      row.paid = 0;
+      row.paidDate = null;
+      while (need > 0 && ci < chunks.length) {
+        if (chunks[ci].amount <= 0) {
+          ci++;
+          continue;
+        }
+        const take = Math.min(need, chunks[ci].amount);
+        chunks[ci].amount -= take;
+        need -= take;
+        row.paid += take;
+        row.paidDate = chunks[ci].date; // last receipt that touched this bucket
+        if (chunks[ci].amount <= 0) ci++;
+      }
+      row.outstanding = Math.max(row.amount - row.paid, 0);
+      if (row.amount > 0 && row.outstanding === 0) {
+        row.status = "Paid";
+      } else if (row.paid > 0) {
+        row.status = "Partial";
+      } else {
+        const due = row.dueDate ? new Date(row.dueDate) : null;
+        if (due) due.setHours(0, 0, 0, 0);
+        row.status = due && due < today ? "Overdue" : "Pending";
+      }
+    }
+
+    return rows;
   };
 
   const handleCancelClick = (member) => {
@@ -769,6 +891,124 @@ export function SiteBookingList() {
                       );
                     })()}
                   </dl>
+
+                  {/* Installment Schedule & Payment Dates */}
+                  {!selectedMember.cancelled &&
+                    (() => {
+                      const isNewUser = memberReceipts.some(
+                        (r) => r.is_new_user === true,
+                      );
+                      const schedule = buildSchedule(
+                        selectedMember,
+                        memberReceipts,
+                        isNewUser,
+                      );
+                      if (!schedule.length) return null;
+                      const totalPaid = schedule.reduce(
+                        (s, r) => s + (r.paid || 0),
+                        0,
+                      );
+                      const totalDue = schedule.reduce(
+                        (s, r) => s + (r.amount || 0),
+                        0,
+                      );
+                      return (
+                        <div className="mt-8">
+                          <h3 className="font-semibold text-[15px] mb-3 text-[#EF742C]">
+                            Installment Schedule &amp; Payment Dates
+                          </h3>
+                          <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="bg-orange-50 text-left text-[#EF742C]">
+                                  <th className="px-4 py-2.5 font-semibold">
+                                    Installment
+                                  </th>
+                                  <th className="px-4 py-2.5 font-semibold">
+                                    Amount
+                                  </th>
+                                  <th className="px-4 py-2.5 font-semibold">
+                                    Due Date
+                                  </th>
+                                  <th className="px-4 py-2.5 font-semibold">
+                                    Paid
+                                  </th>
+                                  <th className="px-4 py-2.5 font-semibold">
+                                    Payment Date
+                                  </th>
+                                  <th className="px-4 py-2.5 font-semibold">
+                                    Status
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {schedule.map((row, i) => (
+                                  <tr
+                                    key={i}
+                                    className="border-t border-gray-100"
+                                  >
+                                    <td className="px-4 py-2.5 font-medium text-gray-700 whitespace-nowrap">
+                                      {row.label}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-gray-700 whitespace-nowrap">
+                                      ₹
+                                      {Number(row.amount).toLocaleString(
+                                        "en-IN",
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">
+                                      {fmtDate(row.dueDate)}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-green-600 font-medium whitespace-nowrap">
+                                      {row.paid > 0
+                                        ? `₹${Number(row.paid).toLocaleString("en-IN")}`
+                                        : "—"}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">
+                                      {row.paidDate ? fmtDate(row.paidDate) : "—"}
+                                    </td>
+                                    <td className="px-4 py-2.5">
+                                      <span
+                                        className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                                          statusStyle[row.status] ||
+                                          statusStyle.Pending
+                                        }`}
+                                      >
+                                        {row.status}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                              <tfoot>
+                                <tr className="border-t border-gray-200 bg-gray-50 font-semibold text-gray-700">
+                                  <td className="px-4 py-2.5">Total</td>
+                                  <td className="px-4 py-2.5 whitespace-nowrap">
+                                    ₹{totalDue.toLocaleString("en-IN")}
+                                  </td>
+                                  <td className="px-4 py-2.5" />
+                                  <td className="px-4 py-2.5 text-green-600 whitespace-nowrap">
+                                    ₹{totalPaid.toLocaleString("en-IN")}
+                                  </td>
+                                  <td className="px-4 py-2.5" colSpan={2} />
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                          {isFetchingReceipts && (
+                            <div className="text-xs text-gray-400 mt-2">
+                              Loading payments…
+                            </div>
+                          )}
+                          <div className="mt-2 text-[11px] text-gray-400">
+                            Paid amounts and payment dates are derived from this
+                            member's receipts (membership fee excluded). Bookings
+                            saved without due dates fall back to a monthly
+                            schedule from the booking date.
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                   {/* Cancellation details */}
                   {selectedMember.cancelled && (
